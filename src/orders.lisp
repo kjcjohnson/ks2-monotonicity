@@ -250,7 +250,11 @@ But...is it actually called? HUHH"
   (cond
     ((eql id (smt:ensure-identifier "IntegerLeq"))
      *integer-leq-order*)
+    ((eql id (smt:ensure-identifier "IntLeq"))
+     *integer-leq-order*)
     ((eql id (smt:ensure-identifier "BoolImplies"))
+     *boolean-implication-order*)
+    ((eql id (smt:ensure-identifier "BoolImpl"))
      *boolean-implication-order*)
     ((eql id (smt:ensure-identifier "RegLanSubset"))
      *reglan-subset-order*)
