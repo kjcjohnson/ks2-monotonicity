@@ -136,11 +136,13 @@
                                       (smt:variable (var-lb actual) sort))
                           lb-guard)))
             when (null mono-type)
-              do (push (smt:$not (smt:$apply (order-singleton-interval-predicate order)
+              do (push (smt:$not (smt:$apply (order-singleton-interval-predicate
+                                              order sort)
                                              (smt:variable (var-lb actual) sort)
                                              (smt:variable (var-ub actual) sort)))
                        ub-guard)
-                 (push (smt:$not (smt:$apply (order-singleton-interval-predicate order)
+                 (push (smt:$not (smt:$apply (order-singleton-interval-predicate
+                                              order sort)
                                              (smt:variable (var-lb actual) sort)
                                              (smt:variable (var-ub actual) sort)))
                        lb-guard)))
@@ -148,7 +150,7 @@
 
 (defun %gen-singleton-check (var sort order &key (invert nil))
   "Generates a singleton interval check for VAR with ORDER. If INVERT, nots the check."
-  (let ((check (smt:$apply (order-singleton-interval-predicate order)
+  (let ((check (smt:$apply (order-singleton-interval-predicate order sort)
                            (smt:variable (var-lb var) sort)
                            (smt:variable (var-ub var) sort))))
     (if invert
@@ -226,7 +228,7 @@
                    for sort = (chc:symbol-sort output-se)
                    for order = (aref orders ix)
                    do (multiple-value-bind (top-lb top-ub)
-                          (order-top order)
+                          (order-top order sort)
                         (push (smt:$= (smt:variable (var-lb name) sort)
                                       (smt:make-native-literal top-lb))
                               lb-setter)
@@ -411,9 +413,10 @@
           for oix in (chc:output-indices head)
           for order = (aref orders oix)
           for formal = (aref (chc:formals head) oix)
+          for sort = (aref (chc:signature head) oix)
           if order
             do (multiple-value-bind (lb ub)
-                   (order-top order)
+                   (order-top order sort)
                  (push (cons (var-lb formal) lb) top-state)
                  (push (cons (var-ub formal) ub) top-state))
           else do (error "Not a known order!"))

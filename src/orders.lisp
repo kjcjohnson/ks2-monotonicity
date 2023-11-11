@@ -14,8 +14,8 @@
   (:documentation "Checks if LEFT is <= RIGHT, according to ORDER"))
 ;; TODO: how to handle incomparable? Deal with later.
 
-(defgeneric order-top (order)
-  (:documentation "Returns top of ORDER as (VALUES TOP-LB TOP-UB)"))
+(defgeneric order-top (order sort)
+  (:documentation "Returns top of ORDER (for SORT) as (VALUES TOP-LB TOP-UB)"))
 
 (defgeneric order-join (order arg1-lb arg1-ub arg2-lb arg2-ub)
   (:documentation "Takes the join of ARG1 and ARG2, according to ORDER")
@@ -48,7 +48,7 @@ elements of the underlying type, e.g., +/- infinity for integers."))
 (defgeneric order-lower-extension-predicate (order)
   (:documentation "Returns a predicate for checking for the lower extension of ORDER"))
 
-(defgeneric order-singleton-interval-predicate (order)
+(defgeneric order-singleton-interval-predicate (order sort)
   (:documentation "Returns a predicate for checking singleton intervals"))
 
 (defgeneric order-singleton-interval (order lower upper)
@@ -75,8 +75,9 @@ elements of the underlying type, e.g., +/- infinity for integers."))
   (declare (type boolean left right))
   (smt:call-smt "=>" left right))
 
-(defmethod order-top ((order boolean-implication))
+(defmethod order-top ((order boolean-implication) sort)
   "Boolean implication interval top."
+  (declare (ignore sort))
   (values (smt:call-smt "false")
           (smt:call-smt "true")))
 
@@ -87,8 +88,9 @@ elements of the underlying type, e.g., +/- infinity for integers."))
 (defparameter *boolean-implication-order* (make-instance 'boolean-implication)
   "The Boolean implication order")
 
-(defmethod order-singleton-interval-predicate ((order boolean-implication))
+(defmethod order-singleton-interval-predicate ((order boolean-implication) sort)
   "Core equality is good enough for Boolean implication intervals"
+  (declare (ignore sort))
   (smt:$function
       "="
       (smt:*bool-sort* smt:*bool-sort*)
@@ -132,8 +134,9 @@ elements of the underlying type, e.g., +/- infinity for integers."))
         ((-infinity? right) nil)
         (t (<= left right))))
 
-(defmethod order-top ((order integer-leq))
+(defmethod order-top ((order integer-leq) sort)
   "Integer leq interval top."
+  (declare (ignore sort))
   (values :-infinity :+infinity))
 
 (defmethod order-extended? ((order integer-leq)) t)
@@ -170,7 +173,8 @@ elements of the underlying type, e.g., +/- infinity for integers."))
       (smt:*int-sort*)
       smt:*bool-sort*))
 
-(defmethod order-singleton-interval-predicate ((order integer-leq))
+(defmethod order-singleton-interval-predicate ((order integer-leq) sort)
+  (declare (ignore sort))
   (smt:$function
       #.+smt-int-leq-singleton+
       (smt:*int-sort* smt:*int-sort*)
@@ -201,8 +205,9 @@ But...is it actually called? HUHH"
   (declare (ignore order lower upper value))
   (error "Cannot compute contains for regular language subset order."))
 
-(defmethod order-top ((order reglan-subset))
+(defmethod order-top ((order reglan-subset) sort)
   "Top values for regular languages"
+  (declare (ignore sort))
   (values (smt:call-smt "re.none")
           (smt:call-smt "re.all")))
 
@@ -211,12 +216,45 @@ But...is it actually called? HUHH"
 
 (defparameter *reglan-subset-order* (make-instance 'reglan-subset))
 
-(defmethod order-singleton-interval-predicate ((order reglan-subset))
+(defmethod order-singleton-interval-predicate ((order reglan-subset) sort)
   "Core equality works fine"
+  (declare (ignore sort))
   (smt:$function "=" (smt:*reglan-sort* smt:*reglan-sort*) smt:*bool-sort*))
 
 (defmethod order-parse-bound ((order reglan-subset) val-string)
   (error "Bounds parsing for RegLan Subset not implemented!"))
+
+;;;
+;;; Bitvector implication
+;;;
+(defclass bit-vector-implication (order)
+  ()
+  (:default-initargs :name "Bit Vector Implication"))
+
+(defparameter *bit-vector-implication-order* (make-instance 'bit-vector-implication))
+
+(defmethod order-<= ((order bit-vector-implication) left right)
+  "Checks if each element of LEFT implies RIGHT"
+  (every #'(lambda (l r)
+             (or (not (= 1 l)) (= 1 r)))
+         left right))
+
+(defmethod order-top ((order bit-vector-implication) sort)
+  "Gets top for bit vector implication"
+  (?:match sort
+    ((smt:bv-sort width)
+     (values (make-array width :element-type 'bit :initial-element 0)
+             (make-array width :element-type 'bit :initial-element 1)))
+    (_ (error "Apparently not a bit vector sort: ~a" sort))))
+
+(defmethod order-extended? ((order bit-vector-implication)) nil)
+
+(defmethod order-singleton-interval-predicate ((order bit-vector-implication) sort)
+  "Core equality is good enough for Boolean implication intervals"
+  (smt:$function
+      "="
+      (sort sort)
+      smt:*bool-sort*))
 
 ;;;
 ;;; Helpers
@@ -231,8 +269,12 @@ But...is it actually called? HUHH"
                           *integer-leq-order*)
                          ((eql sort smt:*reglan-sort*)
                           *reglan-subset-order*)
+                         ((?:match sort ((smt:bv-sort) t))
+                          *BV-ORDER-HACK*)
                          (t nil)))
        (chc:signature head)))
+
+(defvar *BV-ORDER-HACK* nil)
 
 (defun order-for-var (var chc)
   "Gets an order for a particular VAR in CHC."
@@ -258,5 +300,11 @@ But...is it actually called? HUHH"
      *boolean-implication-order*)
     ((eql id (smt:ensure-identifier "RegLanSubset"))
      *reglan-subset-order*)
+    ((eql id (smt:ensure-identifier "BVImpl"))
+     (when (and *BV-ORDER-HACK*
+                (not (eql *BV-ORDER-HACK* *bit-vector-implication-order*)))
+       (error "MULTIPLE BV ORDERS!"))
+     (setf *BV-ORDER-HACK* *bit-vector-implication-order*)
+     *bit-vector-implication-order*)
     (t
      (error "Unknown order: ~a" (smt:identifier-string id)))))
