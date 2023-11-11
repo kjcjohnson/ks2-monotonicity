@@ -205,6 +205,8 @@ output variables for the given head."
          (otherwise (error "Unknown Boolean value: ~a" val-string))))
       ((smt:int-sort)
        (parse-integer val-string))
+      ((smt:string-sort)
+       val-string)
       (_ (error "Unsupported input state sort: ~a" sort)))))
 
 (defun %parse-gfa-input-state (input-hash descriptor context)

@@ -222,7 +222,24 @@ But...is it actually called? HUHH"
   (smt:$function "=" (smt:*reglan-sort* smt:*reglan-sort*) smt:*bool-sort*))
 
 (defmethod order-parse-bound ((order reglan-subset) val-string)
-  (error "Bounds parsing for RegLan Subset not implemented!"))
+  (let ((re (let ((*package* (find-package "COM.KJCJOHNSON.KS2.MONOTONICITY")))
+              (read-from-string val-string))))
+    (labels ((parse-regex (re)
+               (?:match re
+                 ('re.none
+                  (smt:call-smt "re.none"))
+                 ('re.allchar
+                  (smt:call-smt "re.allchar"))
+                 ('re.all
+                  (smt:call-smt "re.all"))
+                 ((list 're.* next)
+                  (smt:call-smt "re.*" (parse-regex next)))
+                 ((list 're.union left right)
+                  (smt:call-smt "re.union" (parse-regex left) (parse-regex right)))
+                 ((list 're.range left right)
+                  (smt:call-smt "re.range" left right))
+                 (_ (error "Cannot parse regex bound: ~a" re)))))
+      (parse-regex re))))
 
 ;;;
 ;;; Bitvector implication
