@@ -457,7 +457,10 @@
              (error "Multiple hole intervals!")))))))
 
 (defun generate-hole-semantics-for-nt (descriptor nt context)
-  (if (should-use-gfa-for-holes?)
+  (if (and (should-use-gfa-for-holes?)
+           ;; We might not have GFA data for the problem, so just use top
+           (< 0 (hash-table-count (monotonicity-gfa-intervals *monotonicity-data*
+                                                              descriptor nt))))
       (generate-gfa-hole-semantics descriptor nt)
       (generate-top-hole-semantics descriptor context)))
 
