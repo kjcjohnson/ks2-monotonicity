@@ -49,9 +49,12 @@
       ;;   For now, ensure that they all have the same monotonicity
       (loop with type = nil
             for mapping in (*:hash-table-values chc-entry)
-            if (null type) do (setf type (gethash identifier mapping))
-              else do (unless (eql type (gethash identifier mapping))
-                        (error "Multiple outputs with different directions!"))))
+            if (null type)
+              do (unless (eql :constant (gethash identifier mapping))
+                   (setf type (gethash identifier mapping)))
+            else do (unless (or (eql type (gethash identifier mapping))
+                                (eql :constant (gethash identifier mapping)))
+                      (error "Multiple outputs with different directions!"))))
     (let ((mapping (first (*:hash-table-values chc-entry))))
       (and mapping (gethash identifier mapping)))))
 
