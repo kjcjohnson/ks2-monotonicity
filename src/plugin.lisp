@@ -35,5 +35,6 @@
 
 (defmethod semgus:cegis-next-example ((solver monotonicity-plugin) problem cegis-spec
                                       descriptor input-state output-state)
-  (let ((ex (generate-interval-example problem descriptor input-state output-state)))
-    (push ex (spec:components (spec:cegis-examples cegis-spec)))))
+  (when (should-generate-interval-semantics? (semgus:context problem))
+    (let ((ex (generate-interval-example problem descriptor input-state output-state)))
+      (push ex (spec:components (spec:cegis-examples cegis-spec))))))
