@@ -338,50 +338,57 @@
           (nconc new-roots (semgus:root-relations context)))
     (setf (gethash :abstraction (semgus:metadata context)) root-rel-names)))
 
-(defun generate-interval-examples (problem)
-  "Generates interval inductive examples"
+(defun generate-interval-example (problem descriptor input-state output-state)
+  "Generates an interval example from a given example"
   (flet ((order-contains-fn (order left-var right-var value)
            #'(lambda (os)
                (let ((left (smt:get-value os left-var))
                      (right (smt:get-value os right-var)))
                  (order-contains order left right value)))))
-    (let ((new-exs nil))
-      (dolist (ex (spec:examples (semgus:specification problem)))
-        (let* ((inputs nil)
-               (output-fns nil)
-               (descriptor (spec:descriptor ex))
-               (head (semgus:lookup-head descriptor (semgus:context problem))))
-          (loop with is = (spec:input-state ex)
-                for iv in (chc:input-formals head)
-                for val = (smt:get-value is iv)
-                do (push (cons (var-lb iv) val) inputs)
-                   (push (cons (var-ub iv) val) inputs))
+    (let* ((inputs nil)
+           (output-fns nil)
+           (head (semgus:lookup-head descriptor (semgus:context problem))))
+      (loop with is = input-state
+            for iv in (chc:input-formals head)
+            for val = (smt:get-value is iv)
+            do (push (cons (var-lb iv) val) inputs)
+               (push (cons (var-ub iv) val) inputs))
 
-          (loop with os = (spec:output-state ex)
-                with orders = (orders-for-head head)
-                for oix in (chc:output-indices head)
-                for ov = (aref (chc:formals head) oix)
-                for order = (aref orders oix)
-                for val = (smt:get-value os ov)
-                if order
-                  do (push (order-contains-fn order (var-lb ov) (var-ub ov) val)
-                           output-fns)
-                else do (error "Not a known order!"))
+      (loop with os = output-state
+            with orders = (orders-for-head head)
+            for oix in (chc:output-indices head)
+            for ov = (aref (chc:formals head) oix)
+            for order = (aref orders oix)
+            for val = (smt:get-value os ov)
+            if order
+              do (push (order-contains-fn order (var-lb ov) (var-ub ov) val)
+                       output-fns)
+            else do (error "Not a known order!"))
 
-          (push (make-instance 'spec:inductive-specification
-                               :descriptor (interval-descriptor descriptor)
-                               :input-state (smt:make-state inputs)
-                               :predicate #'(lambda (os)
-                                              (every (*:rcurry #'funcall os)
-                                                     output-fns)))
-                new-exs)))
-      (setf (semgus:specification problem)
-            (make-instance 'spec:intersection-specification
-                           :components
-                           (list
-                            (semgus:specification problem)
-                            (make-instance 'spec:intersection-specification
-                                           :components (nreverse new-exs))))))))
+      (make-instance 'spec:inductive-specification
+                     :descriptor (interval-descriptor descriptor)
+                     :input-state (smt:make-state inputs)
+                     :predicate #'(lambda (os)
+                                    (every (*:rcurry #'funcall os)
+                                           output-fns))))))
+
+(defun generate-interval-examples (problem)
+  "Generates interval inductive examples"
+  (let ((new-exs nil))
+    (dolist (ex (spec:examples (semgus:specification problem)))
+
+      (push (generate-interval-example problem
+                                       (spec:descriptor ex)
+                                       (spec:input-state ex)
+                                       (spec:output-state ex))
+            new-exs))
+    (setf (semgus:specification problem)
+          (make-instance 'spec:intersection-specification
+                         :components
+                         (list
+                          (semgus:specification problem)
+                          (make-instance 'spec:intersection-specification
+                                         :components (nreverse new-exs)))))))
 
 (defvar *use-gfa-for-holes* 'cl:null "Set to T, NIL, or CL:NULL")
 
@@ -512,6 +519,7 @@
 
 (defmethod semgus:on-context-load ((processor (eql :monotonicity-processor)) context)
   "Performs monotonicity post-processing on a loaded context"
+  (setf *BV-ORDER-HACK* nil)
   (when (should-generate-interval-semantics? context)
     (setup-monotonicity-data context)
     (generate-interval-semantics context)
@@ -527,5 +535,6 @@
 (defmethod semgus:on-problem-load ((processor (eql :monotonicity-processor)) problem)
   "Performs monotonicity post-processing on a loaded problem"
   (when (should-generate-interval-semantics? (semgus:context problem))
-    (generate-interval-examples problem)
+    (when (spec:is-pbe? (semgus:specification problem))
+      (generate-interval-examples problem)) ;; We need CEGIS otherwise
     (format t "Generated interval semantics.~%")))

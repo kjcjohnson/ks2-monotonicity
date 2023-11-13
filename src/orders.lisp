@@ -319,7 +319,8 @@ But...is it actually called? HUHH"
      *reglan-subset-order*)
     ((eql id (smt:ensure-identifier "BVImpl"))
      (when (and *BV-ORDER-HACK*
-                (not (eql *BV-ORDER-HACK* *bit-vector-implication-order*)))
+                (not (eql (class-of *BV-ORDER-HACK*)
+                          (class-of *bit-vector-implication-order*))))
        (error "MULTIPLE BV ORDERS!"))
      (setf *BV-ORDER-HACK* *bit-vector-implication-order*)
      *bit-vector-implication-order*)

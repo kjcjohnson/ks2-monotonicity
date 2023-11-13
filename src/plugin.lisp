@@ -31,3 +31,9 @@
       (setf *generate-interval-semantics* generate-interval-semantics)
       (setf *generate-interval-semantics* 'cl:null))
   (setf *use-gfa-for-holes* use-gfa-holes))
+
+
+(defmethod semgus:cegis-next-example ((solver monotonicity-plugin) problem cegis-spec
+                                      descriptor input-state output-state)
+  (let ((ex (generate-interval-example problem descriptor input-state output-state)))
+    (push ex (spec:components (spec:cegis-examples cegis-spec)))))
