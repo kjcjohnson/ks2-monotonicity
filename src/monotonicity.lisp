@@ -519,7 +519,6 @@
 
 (defmethod semgus:on-context-load ((processor (eql :monotonicity-processor)) context)
   "Performs monotonicity post-processing on a loaded context"
-  (setf *BV-ORDER-HACK* nil)
   (when (should-generate-interval-semantics? context)
     (setup-monotonicity-data context)
     (generate-interval-semantics context)

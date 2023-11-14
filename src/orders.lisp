@@ -273,25 +273,51 @@ But...is it actually called? HUHH"
       (sort sort)
       smt:*bool-sort*))
 
+
+;;;
+;;; Bitvector less than or equal (saturating)
+;;;
+(defclass bit-vector-ule (order)
+  ()
+  (:default-initargs :name "Bit Vector ULE"))
+
+(defparameter *bit-vector-ule-order* (make-instance 'bit-vector-ule))
+
+(defmethod order-<= ((order bit-vector-ule) left right)
+  "Checks if the bit vectors compare with ULE"
+  (smt:call-smt "bvule" left right))
+
+(defmethod order-top ((order bit-vector-ule) sort)
+  "Gets top for bit vector implication"
+  (?:match sort
+    ((smt:bv-sort width)
+     (values (make-array width :element-type 'bit :initial-element 0)
+             (make-array width :element-type 'bit :initial-element 1)))
+    (_ (error "Apparently not a bit vector sort: ~a" sort))))
+
+(defmethod order-extended? ((order bit-vector-ule)) nil)
+
+(defmethod order-singleton-interval-predicate ((order bit-vector-ule) sort)
+  "Core equality is good enough for Boolean implication intervals"
+  (smt:$function
+      "="
+      (sort sort)
+      smt:*bool-sort*))
+
 ;;;
 ;;; Helpers
 ;;;
 (defun orders-for-head (head)
   "Gets a vector of orders for variables in HEAD's signature"
   (declare (type chc:head head))
-  (map 'vector #'(lambda (sort)
-                   (cond ((eql sort smt:*bool-sort*)
-                          *boolean-implication-order*)
-                         ((eql sort smt:*int-sort*)
-                          *integer-leq-order*)
-                         ((eql sort smt:*reglan-sort*)
-                          *reglan-subset-order*)
-                         ((?:match sort ((smt:bv-sort) t))
-                          *BV-ORDER-HACK*)
-                         (t nil)))
-       (chc:signature head)))
-
-(defvar *BV-ORDER-HACK* nil)
+  (let ((head-data (gethash (chc:name head) (%head-data *monotonicity-data*)))
+        (orders-array (make-array (length (chc:formals head)) :initial-element nil)))
+    (assert head-data)
+    (loop for formal across (chc:formals head)
+          for ix from 0
+          do (setf (aref orders-array ix)
+                   (gethash formal head-data)))
+    orders-array))
 
 (defun order-for-var (var chc)
   "Gets an order for a particular VAR in CHC."
@@ -318,11 +344,8 @@ But...is it actually called? HUHH"
     ((eql id (smt:ensure-identifier "RegLanSubset"))
      *reglan-subset-order*)
     ((eql id (smt:ensure-identifier "BVImpl"))
-     (when (and *BV-ORDER-HACK*
-                (not (eql (class-of *BV-ORDER-HACK*)
-                          (class-of *bit-vector-implication-order*))))
-       (error "MULTIPLE BV ORDERS!"))
-     (setf *BV-ORDER-HACK* *bit-vector-implication-order*)
      *bit-vector-implication-order*)
+    ((eql id (smt:ensure-identifier "BVule"))
+     *bit-vector-ule-order*)
     (t
      (error "Unknown order: ~a" (smt:identifier-string id)))))
