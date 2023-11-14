@@ -314,9 +314,19 @@ But...is it actually called? HUHH"
         (orders-array (make-array (length (chc:formals head)) :initial-element nil)))
     (assert head-data)
     (loop for formal across (chc:formals head)
+          for sort across (chc:signature head)
           for ix from 0
           do (setf (aref orders-array ix)
-                   (gethash formal head-data)))
+                   (let ((order (gethash formal head-data)))
+                     (if (null order) ; We apparently need orders for input vars o_O
+                         (cond ((eql sort smt:*bool-sort*)
+                                *boolean-implication-order*)
+                               ((eql sort smt:*int-sort*)
+                                *integer-leq-order*)
+                               ((eql sort smt:*reglan-sort*)
+                                *reglan-subset-order*)
+                               (t nil))
+                         order))))
     orders-array))
 
 (defun order-for-var (var chc)
