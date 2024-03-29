@@ -113,6 +113,7 @@ output variables for the given head."
                        (loop for output-se across (chc:output-symbols chc)
                              for output = (chc:symbol-name output-se)
                              for cdirs = (make-hash-table)
+                             unless (gethash output dirs)
                              do ;; Loop over each child relation
                                 (loop for rel in (chc:body chc)
                                       do (loop for actual in (chc:output-actuals rel)

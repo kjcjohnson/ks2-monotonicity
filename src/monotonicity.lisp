@@ -298,14 +298,16 @@
                                      context)
                               :actuals actuals))))
     (let* ((head (semgus:lookup-head (interval-chc-head-name (chc:head chc)) context))
-           (body (map 'vector #'convert-body-rel (chc:body chc))))
-      (make-instance 'chc:chc
-                     :symbol-table (generate-interval-symbol-table chc)
-                     :head head
-                     :body body
-                     :constraint (generate-interval-constraint chc)
-                     :constructor (chc:constructor chc)
-                     :data nil #+()(chc:data chc)))))
+           (body (map 'vector #'convert-body-rel (chc:body chc)))
+           (new-chc
+             (make-instance 'chc:chc
+                            :symbol-table (generate-interval-symbol-table chc)
+                            :head head
+                            :body body
+                            :constraint (generate-interval-constraint chc)
+                            :constructor (chc:constructor chc)
+                            :data nil #+()(chc:data chc))))
+      new-chc)))
 
 (defun generate-interval-semantics (context)
   (declare (type semgus:semgus-context context))
