@@ -109,6 +109,12 @@
 
 (defun generate-extrema-guard (orig-chc)
   "Generates a guard against extrema"
+  ;; If we don't have a constraint, we can just pass on the interval to the output
+  ;; No need to guard against anything
+  (when (?:match (chc:constraint orig-chc)
+          ((smt:fn "true" _)
+           (return-from generate-extrema-guard (values nil nil)))))
+
   (let ((ub-guard nil)
         (lb-guard nil))
     (loop for body-rel in (chc:body orig-chc) do
@@ -146,6 +152,23 @@
                                              (smt:variable (var-lb actual) sort)
                                              (smt:variable (var-ub actual) sort)))
                        lb-guard)))
+    ;; TODO: Check the CHC's input variables, too!
+    (loop with head = (chc:head orig-chc)
+          with orders = (orders-for-head head)
+          for iix in (chc:input-indices head)
+          for var = (aref (chc:formals head) iix)
+          for sort = (aref (chc:signature head) iix)
+          for mono-type = (monotonicity-type *monotonicity-data* orig-chc var)
+          for order = (aref orders iix)
+          when (order-extended? order)
+            do (push (smt:$apply (order-upper-extension-predicate order)
+                                 (smt:variable (var-ub var) sort))
+                     ub-guard)
+               (push (smt:$apply (order-lower-extension-predicate order)
+                                 (smt:variable (var-lb var) sort))
+                     lb-guard))
+    ;; Also see if we can detangle variables here s.t. we keep independent variables
+    ;;  actually independent - so, e.g., x++ doesn't care if y is +/-inf
     (values lb-guard ub-guard)))
 
 (defun %gen-singleton-check (var sort order &key (invert nil))
