@@ -463,7 +463,10 @@
                     descriptor nt
                     ast:*root-input-descriptor* ast:*root-input-state*))
             (t
-             (error "Multiple hole intervals!")))))))
+             (let ((first (first interval-list)))
+               (unless (every #'(lambda (x) (smt:state= x first)) (rest interval-list))
+                 (error "Multiple hole intervals!"))
+               first)))))))
 
 (defun generate-hole-semantics-for-nt (descriptor nt context)
   (if (and (should-use-gfa-for-holes?)

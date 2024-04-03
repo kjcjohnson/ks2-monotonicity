@@ -238,6 +238,12 @@ But...is it actually called? HUHH"
                   (smt:call-smt "re.union" (parse-regex left) (parse-regex right)))
                  ((list 're.range left right)
                   (smt:call-smt "re.range" left right))
+                 ((list 're.++ left right)
+                  (smt:call-smt "re.++" (parse-regex left) (parse-regex right)))
+                 ((list 'str.to_re str)
+                  (smt:call-smt "str.to_re" str))
+                 ((list 're.+ next)
+                  (smt:call-smt "re.+" (parse-regex next)))
                  (_ (error "Cannot parse regex bound: ~a" re)))))
       (parse-regex re))))
 
