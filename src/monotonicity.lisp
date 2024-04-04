@@ -195,19 +195,29 @@
 (defun extract-non-monotonic-guards (orig-chc)
   "Extracts guards involving only non-monotonic variables"
   (let ((nm-guards nil)
-        (constraint nil))
+        (constraint nil)
+        (non-guarded nil))
     ;;
     ;; Find guard clauses that only involve non-monotonic variables
     (if (smt:is-application? (chc:constraint orig-chc) "and")
         (loop for child in (smt:children (chc:constraint orig-chc))
               for vars = (smt::find-constants child)
-              if (every #'(lambda (v) (and (null (monotonicity-type *monotonicity-data*
-                                                                    orig-chc
-                                                                    (smt:name v)))
-                                           (not (find (smt:name v)
-                                                      (chc:output-symbols orig-chc)
-                                                      :key #'chc:symbol-name))))
-                        vars)
+              if nil #+()(?:match child
+                   ((?:guard (or (smt:fn "=" ((smt:var x) y))
+                                 (smt:fn "=" (y (smt:var x))))
+                             (and (find x (chc:auxiliary-symbols orig-chc)
+                                        :key #'chc:symbol-name)
+                                  (null (smt::find-constants y))))
+                    t))
+                do (push child non-guarded)
+              else if (every #'(lambda (v)
+                                 (and (null (monotonicity-type *monotonicity-data*
+                                                               orig-chc
+                                                               (smt:name v)))
+                                      (not (find (smt:name v)
+                                                 (chc:output-symbols orig-chc)
+                                                 :key #'chc:symbol-name))))
+                             vars)
                 do (push child nm-guards)
               else
                 do (push child constraint))
@@ -225,7 +235,8 @@
                                                             :invert t))
            collect (apply #'smt:$or (append checks
                                             (list (%update-vars guard #'var-ub)))))
-     (apply #'smt:$and constraint))))
+     (apply #'smt:$and constraint)
+     non-guarded)))
 
 (defun generate-interval-constraint (orig-chc)
   "Generates a new CHC constraint for interval semantics. Assumes +monotonic for now"
@@ -260,7 +271,7 @@
                               ub-setter)))
              (values (apply #'smt:$and lb-setter) (apply #'smt:$and ub-setter)))))
 
-    (multiple-value-bind (nm-guards constraint)
+    (multiple-value-bind (nm-guards constraint non-guarded)
         (extract-non-monotonic-guards orig-chc)
       (multiple-value-bind (lb-guard ub-guard)
           (generate-extrema-guard orig-chc)
@@ -268,6 +279,8 @@
             (output-top-setter)
           (apply #'smt:$and
                  (append
+                  (map 'list (*:rcurry #'update-vars #'var-lb) non-guarded)
+                  (map 'list (*:rcurry #'update-vars #'var-ub) non-guarded)
                   nm-guards
                   (list
                    (smt:$or

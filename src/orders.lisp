@@ -343,6 +343,11 @@ But...is it actually called? HUHH"
         when ix
           do (return-from order-for-var
                (aref (orders-for-head (chc:head body-rel)) ix)))
+  ;; Then try the CHC head itself
+  (*:when-let (ix (position var (chc:formals (chc:head chc)) :test #'eql))
+    (return-from order-for-var
+      (aref (orders-for-head (chc:head chc)) ix)))
+
   (error "Cannot find order for: ~a" var))
 
 (defun order-for-id (id)
