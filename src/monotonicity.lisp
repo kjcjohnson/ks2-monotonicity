@@ -160,7 +160,7 @@
           for sort = (aref (chc:signature head) iix)
           for mono-type = (monotonicity-type *monotonicity-data* orig-chc var)
           for order = (aref orders iix)
-          when (order-extended? order)
+          when (and order (order-extended? order))
             do (push (smt:$apply (order-upper-extension-predicate order)
                                  (smt:variable (var-ub var) sort))
                      ub-guard)
